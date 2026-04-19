@@ -19,14 +19,13 @@ def _build_db_url(raw_url: str) -> tuple[str, dict]:
         ssl_ctx.verify_mode = stdlib_ssl.CERT_NONE
         connect_args["ssl"] = ssl_ctx
 
-    scheme = parsed.scheme.replace("postgres://", "postgresql+asyncpg://")
-    if parsed.scheme == "postgres":
+    if parsed.scheme in ("postgres", "postgresql", "postgresql+asyncpg"):
         scheme = "postgresql+asyncpg"
-    elif parsed.scheme == "postgresql":
-        scheme = "postgresql+asyncpg"
+    else:
+        scheme = parsed.scheme
 
     clean_query = urlencode(params, doseq=True)
-    clean_url = urlunparse(parsed._replace(scheme=scheme, query=clean_query))
+    clean_url = urlunparse((scheme, parsed.netloc, parsed.path, parsed.params, clean_query, parsed.fragment))
     return clean_url, connect_args
 
 
