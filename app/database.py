@@ -1,5 +1,5 @@
+import re
 import ssl as stdlib_ssl
-from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
@@ -8,25 +8,20 @@ from app.config import settings
 
 
 def _build_db_url(raw_url: str) -> tuple[str, dict]:
-    parsed = urlparse(raw_url)
-    params = parse_qs(parsed.query)
     connect_args: dict = {}
 
-    sslmode = params.pop("sslmode", [None])[0]
-    if sslmode and sslmode != "disable":
+    has_ssl = bool(re.search(r"[?&](?:sslmode|ssl)=", raw_url))
+    url = re.sub(r"[?&](?:sslmode|ssl)=[^&]*", "", raw_url)
+
+    if has_ssl:
         ssl_ctx = stdlib_ssl.create_default_context()
         ssl_ctx.check_hostname = False
         ssl_ctx.verify_mode = stdlib_ssl.CERT_NONE
         connect_args["ssl"] = ssl_ctx
 
-    if parsed.scheme in ("postgres", "postgresql", "postgresql+asyncpg"):
-        scheme = "postgresql+asyncpg"
-    else:
-        scheme = parsed.scheme
+    url = re.sub(r"^postgres(ql)?://", "postgresql+asyncpg://", url)
 
-    clean_query = urlencode(params, doseq=True)
-    clean_url = urlunparse((scheme, parsed.netloc, parsed.path, parsed.params, clean_query, parsed.fragment))
-    return clean_url, connect_args
+    return url, connect_args
 
 
 _db_url, _connect_args = _build_db_url(settings.database_url)
